@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<title>Pensionifondide kalkulaator</title>
+
+<style>
+  html {
+    min-width: 1000px;
+  }
+  body{
+    font: 11px "San Francisco", Helvetica, Arial, sans-serif;
+    background: #fffcfc;
+    margin: 8em auto 4em auto;
+    position: relative;
+    width: 1200px;
+  }
+  input, select{
+    margin-right: 20px;
+  }
+  #juhis{
+    font-size: 26px;
+  }
+  .legend{
+    font-size: 13;
+  }
+  .datas{
+    margin-right: auto;
+    margin-left: 20px;
+  }
+  .tick line{
+    opacity: 0.2;
+  }
+  aside{
+    margin-top: 220px;
+    margin-left: 4.5em;
+    position: relative;
+    width: 150px;
+    float: left;
+    text-align: right;
+    font-size: 11px;
+  }
+  h1{
+    margin-left: 0.6em;
+    float: left;
+    text-align: right;
+    position: absolute;
+    font-size: 24px;
+  }
+  .first{
+    margin-left: auto;
+    margin-right: 180px;
+    width: 700px;
+    text-align: justify;
+  }
+  div{
+    text-align: center;
+  }
+</style>
+<body>
+  <h1>Pensionifondide </br> kalkulaator</h1>
+  <aside class="helper2">
+    <p>Vasakul olevale joonisele saab hiire (või mobiilsetel seadmetel näpuga) joonistada palgaprofiili, mille põhjal arvutatakse erinevate pensionifondide osakute kumulatiivne väärtus</p>
+    </br></br></br></br>
+    <p>Tulemusi on võimalik kuvada fondiliikide kaupa</p>
+    </br></br></br>
+    <p>Minnes hiirega fondi täispika nime peale on võimalik varjata teised fondid</p>
+    </br></br></br></br></br></br></br></br></br></br></br></br></br></br>
+  </aside>
+  <div class="first">
+    <p>Pensionifondide kalkulaator võimaldab arvutada pensionifondide sissemaksete tootlust (<a href="https://en.wikipedia.org/wiki/Internal_rate_of_return">IRR - Internal rate of return</a>) vastavalt sissemaksete ajale ja suurusele. Arvutustel on võetud tehingukuupäevaks iga kuu esimene kuupäev ning lahutatud tehingu teenustasu. Samuti on võetud arvesse eriperioodidel kehtinud erinevat riigipoolse juurdemakse protsenti. Täpsemate tulemuste saamiseks on lisaks võimalik valida:
+    <ul>
+      <li>kas teie sünniaasta on enne või pärast 1955. aastat,</li>
+      <li>kas te jätkasite isiklikke sissemakseid aastal 2010 ning </li>
+      <li>kas te suurendasite vabatahtlikult isiklikke sissemakseid 3% peale vahemikus 2014-2017.</li>
+    </ul>
+    Käesolev kalkulaator on loodud autorite akadeemilisest huvist teema vastu ning selle tulemused ei ole mõeldud soovitusena pensionifonde puudutavates küsimustes. Lisaks tootlusele tuleks arvestada fondide riskiastmega, mida kalkulaator ei käsitle. Täpsem mudel, kus on arvestatud inflatsiooni ja õigete tehingukuupäevadega, on võimalik leida <a href="http://citis.ut.ee/">CITISe</a> lehelt: <a href="http://citis.ut.ee/research/other/pensionifondide-tootluse-uhest-analuusivoimalusest"> citis.ut.ee/research/other/pensionifondide-tootluse-uhest-analuusivoimalusest</a>
+    </p>
+    </br>
+  </div>
+  <div class="container">
+    Palgaskaala ülempiir:
+    <select onchange="maximumInput(this.value)">
+      <option value="2000">2000€</option>
+      <option value="3000">3000€</option>
+      <option value="4000">4000€</option>
+      <option value="5000">5000€</option>
+      <option value="6000">6000€</option>
+      <option value="7000">7000€</option>
+      <option value="8000">8000€</option>
+      <option value="9000">9000€</option>
+      <option value="10000">10 000€</option>
+    </select>
+    Sündinud pärast 1955. aastat <input id="1955sündinud" class="checks" type="checkbox" checked="checked">
+    Isiklikud sissemaksed aastal 2010 <input id="2010sissemaksed" class="checks" type="checkbox" checked="checked">
+    Suurendatud isiklikud sissemaksed aastatel 2014-2017 <input id="vabatahtlik" class="checks" type="checkbox" checked="checked">
+  </div>
+  <div>
+  Pensionifondi liik:
+    <input id="data1" class="datas" type="radio" name="dataset" value="konservatiivne.txt" checked="checked"> konservatiivne
+    <input id="data2" class="datas" type="radio" name="dataset" value="tasakaalustatud.txt"> tasakaalustatud
+    <input id="data3" class="datas" type="radio" name="dataset" value="progressiivne.txt"> progressiivne
+    <input id="data4" class="datas" type="radio" name="dataset" value="agressiivne.txt"> agressiivne
+  </div>
+  <div class="container2">
+  </div>
+  <script src="http://d3js.org/d3.v4.min.js"></script>
+  <script>
+    d3.selectAll(".checks").on("change", function() {
+      fondUpdate();
+    })
+
+    d3.selectAll(".datas").on("click", function() {
+      fondUpdate();
+    })
+
+    var margin = {top: 20, right: 120, bottom: 30, left: 70},
+    width = 950 - margin.left - margin.right,
+    height = 200 - margin.top - margin.bottom;
+
+    var x = d3.scaleTime().range([0, width]),
+    y = d3.scaleLinear().range([height, 0]),
+    maxInput = 2000;
+
+    var line = d3.line()
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.bruto); });
+
+    var userLine = d3.line()
+    .x(function(d) { return x(d.x); })
+    .y(function(d) { return y(d.y); })
+    .curve(d3.curveMonotoneX);
+
+    var svg = d3.select(".container").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom);
+    var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    d3.tsv("bruto.txt", function(error, data) {
+
+      data.forEach(function(d,i) {
+        d.date = new Date(+d.year, +d.month-1, 1);
+        d.bruto = +d.bruto;
+      });
+      
+      userInput = [];
+      data.forEach(function(d){
+        var x = d.date;
+        var y = 0;
+        var defaultData= {x: x, y: y};
+        userInput.push(defaultData);
+      });
+      
+      x.domain(d3.extent(data, function(d) { return d.date; }));
+      y.domain([0, maxInput]);
+
+      g.append("text")
+      .attr("id", "juhis")
+      .attr("x", width/2)
+      .attr("y", height/2 + 12)
+      .style("text-anchor", "middle")
+      .style("fill", "grey")
+      .style("opacity", .5)
+      .text("Siia joonista oma palgaprofiil!")
+
+      g.append("clipPath")
+      .attr("id", "box")
+      .append("rect")
+      .attr("width", width)
+      .attr("height", height);
+
+      g.append("path")
+      .data(data)
+      .attr("id", "bruto")
+      .attr("d", line(data))
+      .style("fill", "none")
+      .style("stroke", "grey")
+      .style("stroke-width", 1);
+
+      g.append("text")
+      .attr("id", "brutoText")
+      .attr("y", function(){ return y(data[data.length-1].bruto)+5; })
+      .attr("x", width + 5)
+      .style("fill", "grey")
+      .text("Keskmine bruto palk");
+
+      g.append("path")
+      .data(userInput)
+      .attr("id", "userInput")
+      .attr("d", userLine(userInput))
+      .attr("clip-path", "url(#box)")
+      .style("fill", "none")
+      .style("stroke", "#fc9920")
+      .style("stroke-width", 2);
+
+      g.append("text")
+      .attr("id", "userInputText")
+      .attr("y", function(){ return y(0)+5; })
+      .attr("x", width + 5)
+      .style("fill", "#fc9920")
+      .text("Sinu bruto palk");
+
+      g.selectAll(".circles")
+      .data(userInput)
+      .enter()
+      .append("circle")
+      .attr("class", function(d,i){ return "circle" + i; })
+      .attr("id", "userInputPoints")
+      .attr("clip-path", "url(#box)")
+      .attr("cx", function(d){return x(d.x);})
+      .attr("cy", function(d){return y(d.y);})
+      .attr("r", 2.5)
+      .style("fill", "none")
+      .style("stroke", "#fc9920")
+      .style("stroke-width", 1);
+
+      g.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x).tickSize(-height,5))
+      .append("text")
+      .attr("class", "label")
+      .attr("x", width-5)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .style("fill", "black")
+      .text("Aeg");
+
+      g.append("g")
+      .attr("class", "y axis")
+      .call(d3.axisLeft(y).tickSize(-width,5))
+      .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("x", -5)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .style("fill", "black")
+      .text("Bruto palk");
+
+      g.append("text")
+      .attr("class", "helper")
+      .style("display", "none")
+      .style("fill", "#fc9920");
+
+      g.append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .style("fill", "none")
+      .style("pointer-events", "all")
+      .on("click", dataInput)
+      .on("mousemove", helper)
+      .on("mouseout", helperout)
+      .call(d3.drag().on("drag", dataInput).on("end", function(d) { fondUpdate() }));
+
+      function helper(){
+        setInterval(function(){
+          d3.selectAll("#juhis")
+          .transition()
+          .duration(2000)
+          .style("opacity", 0);
+
+          setInterval(function(){
+            d3.selectAll("#juhis")
+            .remove();
+          },4000);
+        },4000);
+
+        var coords = d3.mouse(this),
+        mouseDate = x.invert(coords[0]),
+        dates = userInput.map(function(d) {return d.x; });
+
+        var bisect = d3.bisector(function(d) { return d; }).right,
+        i = bisect(dates, mouseDate);
+
+        var d0 = dates[i - 1],
+        d1 = dates[i],
+        inputX = mouseDate - d0[0] > d1[0] - mouseDate ? d1 : d0;
+        inputY = y.invert(coords[1]);
+
+        var index = dates.indexOf(inputX);
+        if(coords[0] > width - (width/(userInput.length-1))/2 ){
+          var index = userInput.length - 1;
+          var inputData = {x: userInput[index].x, y: inputY, yearMonth: userInput[index].yearMonth};
+        }
+        if (index !== -1) {
+          g.selectAll("#userInputPoints")
+          .style("fill", "none");
+          g.select(".circle"+index)
+          .style("fill", "#fc9920");
+
+          g.select(".helper")
+          .attr("transform", function(d){ return "translate("+ (x(userInput[index].x) - 12)  +","+ (y(userInput[index].y) - 10) +")"; })
+          .style("display", "inline")
+          .text(d3.format(".0f")(userInput[index].y) + "€")
+        }
+      }
+
+      function helperout(){
+        g.select(".helper")
+        .style("display", "none")
+        g.selectAll("#userInputPoints")
+        .style("fill", "none");
+      }
+
+      function dataInput(){
+
+        var coords = d3.mouse(this),
+        mouseDate = x.invert(coords[0]),
+        dates = userInput.map(function(d) {return d.x; });
+
+        var bisect = d3.bisector(function(d) { return d; }).right,
+        i = bisect(dates, mouseDate);
+
+        var d0 = dates[i - 1],
+        d1 = dates[i],
+        inputX = mouseDate - d0[0] > d1[0] - mouseDate ? d1 : d0,
+        inputY = y.invert(coords[1]);
+        if(inputY > maxInput){
+          var inputY = maxInput;
+        } else if (inputY < 0){
+          var inputY = 0;
+        }
+
+        var inputData = {x: inputX, y: inputY, yearMonth: d3.timeFormat("%Y-%m")(inputX)};
+
+        var index = dates.indexOf(inputX);
+        if(coords[0] > width - (width/(userInput.length-1))/2 ){
+          var index = userInput.length - 1;
+          var inputData = {x: userInput[index].x, y: inputY, yearMonth: d3.timeFormat("%Y-%m")(userInput[index].x)};
+        }
+        if (index !== -1) {
+          userInput[index] = inputData;
+
+          g.selectAll("#userInputPoints")
+          .style("fill", "none");
+          g.select(".circle"+index)
+          .style("fill", "#fc9920");
+
+          g.select(".helper")
+          .attr("transform", function(d){ return "translate("+ (x(userInput[index].x) - 12)  +","+ (y(userInput[index].y) - 10) +")"; })
+          .style("display", "inline")
+          .text(d3.format(".0f")(userInput[index].y) + "€")
+        }
+
+        update();
+      }
+
+      maximumInput = function maximumInput(value){
+        maxInput = value;
+        scaleUpdate();
+      }
+
+      function update(){
+
+        g.select("#userInput")
+        .data(userInput)
+        .transition()
+        .duration(10)
+        .attr("d", userLine(userInput));
+
+        g.selectAll("#userInputPoints")
+        .data(userInput)
+        .transition()
+        .duration(10)
+        .attr("cx", function(d){return x(d.x);})
+        .attr("cy", function(d){return y(d.y);});
+
+        g.select("#userInputText")
+        .transition()
+        .duration(10)
+        .attr("y", function(d){return y(userInput[userInput.length-1].y);});
+
+      }
+
+      function scaleUpdate(){
+        y.domain([0, maxInput]);
+        var time = 500;
+        g.select(".y.axis")
+        .transition()
+        .duration(time)
+        .call(d3.axisLeft(y).tickSize(-width,5));
+
+        g.select("#bruto")
+        .transition()
+        .duration(time)
+        .attr("d", line(data));
+
+        g.select("#brutoText")
+        .transition()
+        .duration(time)
+        .attr("y", function(){ return y(data[data.length-1].bruto)+5; });
+
+        g.select("#userInput")
+        .data(userInput)
+        .transition()
+        .duration(time)
+        .attr("d", userLine(userInput));
+
+        g.selectAll("#userInputPoints")
+        .data(userInput)
+        .transition()
+        .duration(time)
+        .attr("cx", function(d){return x(d.x);})
+        .attr("cy", function(d){return y(d.y);});
+
+        g.select("#userInputText")
+        .transition()
+        .duration(time)
+        .attr("y", function(d){return y(userInput[userInput.length-1].y);});
+      }
+    });
+
+  </script>
+
+  <script>
+   var margin2 = {top: 20, right: 120, bottom: 30, left: 70},
+   width2 = 950 - margin2.left - margin2.right,
+   height2 = 500 - margin2.top - margin2.bottom;
+
+   var x2 = d3.scaleTime().range([0, width2]),
+   y2 = d3.scaleLinear().range([height2, 0]),
+   c2 = d3.scaleOrdinal(d3.schemeCategory20);
+
+   var line2 = d3.line()
+   .x(function(d) { return x2(d.x); })
+   .y(function(d) { return y2(d.y); })
+   .curve(d3.curveMonotoneX);
+
+   var svg2 = d3.select(".container2").append("svg")
+   .attr("width", width2 + margin2.left + margin2.right)
+   .attr("height", height2 + margin2.top + margin2.bottom);
+   var g2 = svg2.append("g").attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+   var dataDates =d3.timeMonths(new Date(2003,01,01), new Date(2016,05,01));
+
+   x2.domain(d3.extent(dataDates, function(d) { return d; }));
+   y2.domain([0, 5000]);
+
+   g2.append("text")
+   .attr("id", "juhis")
+   .attr("x", width2/2)
+   .attr("y", height2/2 + 12)
+   .style("text-anchor", "middle")
+   .style("fill", "grey")
+   .style("opacity", .5)
+   .text("Siia joonistub soetatud osakute väärtus eurodes")
+
+   g2.append("clipPath")
+   .attr("id", "box2")
+   .append("rect")
+   .attr("width", width2)
+   .attr("height", height2);
+
+   g2.append("g")
+   .attr("class", "x axis2")
+   .attr("transform", "translate(0," + height2 + ")")
+   .call(d3.axisBottom(x2).tickSize(-height2,5))
+   .append("text")
+   .attr("class", "label")
+   .attr("x", width2-5)
+   .attr("y", -6)
+   .style("text-anchor", "end")
+   .style("fill", "black")
+   .text("Aeg");
+
+   g2.append("g")
+   .attr("class", "y axis2")
+   .call(d3.axisLeft(y2).tickSize(-width2,5))
+   .append("text")
+   .attr("class", "label")
+   .attr("transform", "rotate(-90)")
+   .attr("y", 6)
+   .attr("x", -5)
+   .attr("dy", ".71em")
+   .style("text-anchor", "end")
+   .style("fill", "black")
+   .text("Osakute kumulatiivne puhasväärtus");
+
+
+   function fondUpdate(){
+    if(document.getElementById("data1").checked){
+      dataset = document.getElementById("data1").value;
+      names = ["LHV Pensionifond Intress", "LHV Pensionifond S", "Nordea Pensionifond C", "Swedbank Pensionifond K1 (konservatiivne strateegia)", "LHV Pensionifond XS", "SEB Konservatiivne Pensionifond"];
+    }
+    if(document.getElementById("data2").checked){
+      dataset = document.getElementById("data2").value;
+      names = ["Swedbank Pensionifond K2 (tasakaalustatud strateegia)", "LHV Pensionifond M", "LHV Pensionifond 25", "Nordea Pensionifond B", "SEB Optimaalne Pensionifond"];
+    }
+    if(document.getElementById("data3").checked){
+      dataset = document.getElementById("data3").value;
+      names = ["LHV Pensionifond 50", "Swedbank Pensionifond K3 (kasvustrateegia)", "LHV Pensionifond L", "Nordea Pensionifond A", "SEB Progressiivne Pensionifond"];
+    }
+    if(document.getElementById("data4").checked){
+      dataset = document.getElementById("data4").value;
+      names = ["LHV Pensionifond XL", "Swedbank Pensionifond K4 (Aktsiastrateegia)", "SEB Energiline Pensionifond", "Nordea Pensionifond A Pluss"];
+    }
+
+    dataSelection(dataset);
+    function dataSelection(dataset){
+
+      eesti = d3.timeFormatLocale({
+        "dateTime": "%a %b %e %X %Y",
+        "date": "%m-%d-%Y",
+        "time": "%H:%M:%S",
+        "periods": ["AM", "PM"],
+        "days": ["Pühapäev", "Esmaspäev", "Teisipäev", "Kolmapäev", "Neljapäev", "Reede", "Laupäev"],
+        "shortDays": ["Pühap", "Esmasp", "Teisip", "Kolmap", "Neljap", "Reede", "Laup"],
+        "months": ["Jaanuar", "Veebruar", "Märts", "Aprill", "Mai", "Juuni", "Juuli", "August", "September", "Oktoober", "November", "Detsember"],
+        "shortMonths": ["Jaan", "Veebr", "Märts", "Apr", "Mai", "Juuni", "Juuli", "Aug", "Sep", "Okt", "Nov", "Dets"]
+      });
+
+      var formatMillisecond = eesti.format(".%L"),
+      formatSecond = eesti.format(":%S"),
+      formatMinute = eesti.format("%I:%M"),
+      formatHour = eesti.format("%I %p"),
+      formatDay = eesti.format("%a %d"),
+      formatWeek = eesti.format("%b %d"),
+      formatMonth = eesti.format("%B"),
+      formatYear = eesti.format("%Y");
+
+      eestiaeg = function multiFormat(date) {
+        return (d3.timeSecond(date) < date ? formatMillisecond
+          : d3.timeMinute(date) < date ? formatSecond
+          : d3.timeHour(date) < date ? formatMinute
+          : d3.timeDay(date) < date ? formatHour
+          : d3.timeMonth(date) < date ? (d3.timeWeek(date) < date ? formatDay : formatWeek)
+          : d3.timeYear(date) < date ? formatMonth
+          : formatYear)(date);
+        }
+
+      d3.tsv(dataset, function(error, df) {
+        df.forEach(function(d,i) {
+          d.date = new Date(+d.year, +d.month-1, +d.day);
+          d.year = +d.year;
+          d.yearMonth = d3.timeFormat("%Y-%m")(d.date)
+          d.nav = +d.nav;
+          d.kinni = +d.kinni;
+          d.enne55_jatkab = +d.enne55_jatkab;
+          d.katkestab_3ei = +d.katkestab_3ei;
+          d.katkestab_3jah = +d.katkestab_3jah;
+          d.parast55_jatkab_3ei = +d.parast55_jatkab_3ei;
+          d.parast55_jatkab_3jah = +d.parast55_jatkab_3jah;
+        });
+        df = df.filter(function(d){ return d.date <= new Date(2016,05,01); });
+
+        var years = [2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016],
+        months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+        userInput2 = [];
+        years.forEach(function(d){
+          months.forEach(function(g){
+            var x = new Date(+d, +g, 1);
+            if(x <= new Date(2016,4,1)){
+              var bisect = d3.bisector(function(d) { return d.x; }).right,
+              i = bisect(userInput, x);
+
+              if(i==0) { 
+                var d0 = userInput[0],
+                d1 = userInput[1],
+                inputX = x - d0.x > d1.x - x ? d1 : d0;
+              } else {
+                var d0 = userInput[i - 1],
+                d1 = userInput[i],
+                inputX = x - d0.x > d1.x - x ? d1 : d0;
+              }
+              var y = inputX.y;
+              var defaultData = {x: x, y: y, yearMonth: d3.timeFormat("%Y-%m")(x)};
+              userInput2.push(defaultData);
+            }
+          })
+        });
+
+        newDates = userInput2.filter(function(d){ return d.x >= userInput2.find(function(g){ return g.y > 0; }).x && d.x < new Date(2016,01,01); });
+        x2.domain(d3.extent(newDates, function(d) { return d.x; }));
+
+        function join(mis, millega, select) {
+          output = [];
+          for (i = 0; i < mis.length; i++) {
+            var x = mis[i];
+            var y = millega.filter(function(d, i){ return d.yearMonth ==  x.yearMonth; });
+
+            if(y.length == 0) { continue; };
+            output.push(select(x, y[0].y)); 
+          }
+          return output;
+        };
+
+        var df = join(df, userInput2, function(x, y){
+          return{
+            date: x.date,
+            day: x.day,
+            nav: x.nav,
+            symbol: x.symbol,
+            kinni: x.kinni,
+            enne55_jatkab: x.enne55_jatkab,
+            katkestab_3ei: x.katkestab_3ei,
+            katkestab_3jah: x.katkestab_3jah,
+            parast55_jatkab_3ei: x.parast55_jatkab_3ei,
+            parast55_jatkab_3jah: x.parast55_jatkab_3jah,
+            bruto: y
+          }
+        });
+
+        df.forEach(function(d){
+
+          if(!document.getElementById("1955sündinud").checked && document.getElementById("2010sissemaksed").checked){
+            d.input = d.bruto * d.enne55_jatkab * (1-(d.kinni / 100));
+          } else if (!document.getElementById("2010sissemaksed").checked && !document.getElementById("vabatahtlik").checked){
+            d.input = d.bruto * d.katkestab_3ei * (1-(d.kinni / 100));
+          } else if (!document.getElementById("2010sissemaksed").checked && document.getElementById("vabatahtlik").checked){
+            d.input = d.bruto * d.katkestab_3jah * (1-(d.kinni / 100));
+          } else if (document.getElementById("1955sündinud").checked && document.getElementById("2010sissemaksed").checked && !document.getElementById("vabatahtlik").checked){
+            d.input = d.bruto * d.parast55_jatkab_3ei * (1-(d.kinni / 100));
+          } else if (document.getElementById("1955sündinud").checked && document.getElementById("2010sissemaksed").checked && document.getElementById("vabatahtlik").checked){
+            d.input = d.bruto * d.parast55_jatkab_3jah * (1-(d.kinni / 100));
+          } 
+
+          if(d.day == 1) {
+            d.osakud = d.input / d.nav;
+          } else {
+            d.osakud = 0;
+          }
+        })
+
+        maxValues = [];
+        cumsum = [];
+        var nestedData = d3.nest()
+        .key(function(d){return d.symbol;})
+        .entries(df);
+
+        nestedData.forEach(function(d,i){
+          var tmp = [];
+          var fond = d.values.map(function(d){ return d; });
+
+          tmp.push({sum: fond[0].osakud, x: fond[0].date, y: fond[0].osakud*fond[0].nav, symbol: fond[0].symbol});
+
+          for (i=1; i < fond.length; i++) {
+            var sum = tmp[i-1].sum + fond[i].osakud;
+            var value = sum * fond[i].nav;
+            tmp.push({sum: sum, x: fond[i].date, y: value, symbol: fond[i].symbol});
+            cumsum.push({sum: sum, x: fond[i].date, y: value, symbol: fond[i].symbol});
+          }
+          maxValues.push(d3.max(tmp, function(d) {return d.y; } ));
+        })
+
+        g2.select(".x.axis2")
+        .transition()
+        .duration(500)
+        .call(d3.axisBottom(x2).tickSize(-height2,5).tickFormat(eestiaeg));
+
+        y2.domain([0, d3.max(maxValues)+1000]);
+        g2.select(".y.axis2")
+        .transition()
+        .duration(500)
+        .call(d3.axisLeft(y2).tickSize(-width2,5));
+
+        var cumsumNest = d3.nest()
+        .key(function(d){return d.symbol;})
+        .entries(cumsum.filter(function(d){ return d.x < new Date(2015,12,1) }));
+
+        cumsumNest.forEach(function(d, i){
+
+          var fondLines = g2.append("g")
+          .attr("class", "jooned");
+
+          fondLines.append("path")
+          .attr("class", "fondLine")
+          .style("fill", "none")
+          .attr("clip-path", "url(#box2)")
+          .style("stroke-width", 1.2)
+          .style("stroke", c2(i));
+
+          fondLines.append("text")
+          .attr("class", "fondText")
+          .attr("dy", ".35em")
+          .attr("x", width2 + 5)
+          .attr("y", height2 / 2)
+          .style("fill", c2(i));
+
+        });
+
+        d3.selectAll(".fondLine")
+        .data(cumsumNest)
+        .transition()
+        .duration(500)
+        .attr("id", function(d, i){return "fondid" + i; })
+        .attr("d", function(d){ return line2(d.values); });
+
+        d3.selectAll(".fondText")
+        .data(cumsumNest)
+        .transition()
+        .duration(500)
+        .attr("id", function(d, i){return "fondid" + i; })
+        .attr("x", width2 + 5)
+        .attr("y", function(d,i){ 
+          var lastValue = cumsumNest[i].values[(cumsumNest[i].values.length-1)].y;
+          return y2(lastValue);})
+        .text(function(d){ return d.key + " - " + d3.format(".0f")(d.values[d.values.length-1].y) + "€" });
+
+        d3.selectAll(".jooned")
+        .data(cumsumNest)
+        .exit()
+        .remove();
+
+        d3.selectAll(".legend")
+        .remove();
+
+        names.forEach(function(d, i){
+          g2.append("text")
+          .data(names)
+          .attr("class", "legend")
+          .attr("x", 40)
+          .attr("y", 20 + (i*18))
+          .attr("fill", c2(i))
+          .text(function(d) { return names[i]; })
+          .on("mouseover", function(d){
+            d3.selectAll(".fondLine")
+            .style("display", "none");
+            d3.selectAll(".fondText")
+            .style("display", "none");
+            d3.selectAll("#fondid" + i )
+            .style("display", "inline");
+          })
+          .on("mouseout", function(d){
+            d3.selectAll(".fondLine")
+            .style("display", "inline");
+            d3.selectAll(".fondText")
+            .style("display", "inline");
+          });
+        });
+
+      });
+  }
+}
+
+</script>
+</body>
+</html>
